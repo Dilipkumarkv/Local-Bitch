@@ -6,8 +6,9 @@ plugins {
 }
 
 android {
-  namespace = "com.example"
+  namespace = "com.dilipkumarkv.localgguf"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
+  ndkVersion = "26.1.10909125"
 
   defaultConfig {
     applicationId = "com.dilipkumarkv.localgguf"
@@ -20,6 +21,19 @@ android {
     
     ndk {
       abiFilters.addAll(listOf("arm64-v8a", "x86_64"))
+    }
+
+    externalNativeBuild {
+      cmake {
+        cppFlags += "-std=c++17 -O3"
+      }
+    }
+  }
+
+  externalNativeBuild {
+    cmake {
+      path = file("src/main/cpp/CMakeLists.txt")
+      version = "3.22.1"
     }
   }
 

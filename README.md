@@ -15,7 +15,7 @@ A minimal, native, offline-first Android application designed exclusively for lo
 |---|---|---|---|
 | **Phase 0** | Recon / Technical Design | **COMPLETE** | Architecture, ADRs, build specs, and engine notes defined in `/docs/`. |
 | **Phase 1** | Android Shell | **COMPLETE** | M3 Theme (dark/light), typography, bottom navigation (Models, Chat, Settings). |
-| **Phase 2** | Native llama.cpp Integration | **COMPLETE** | Native bridge abstraction (`LocalInferenceEngine`, `NativeLlamaEngine`, `EmbeddedFallbackEngine`). |
+| **Phase 2** | Native llama.cpp Integration | **COMPLETE** | Real C++ JNI bridge (`libllama-android.so`) compiled via CMake/NDK (`arm64-v8a`, `x86_64`) with `LocalInferenceEngine` & `NativeLlamaEngine`. |
 | **Phase 3** | Model Library | **COMPLETE** | SAF file picker, binary GGUF header parser, private storage copying, memory validation. |
 | **Phase 4** | Chat Engine | **COMPLETE** | Real-time token streaming, cancellation, multi-turn history, metrics banner (tok/s, prefill). |
 | **Phase 5** | Persistence | **COMPLETE** | Room SQLite database (`ModelEntity`, `ConversationEntity`, `MessageEntity`), DataStore settings. |
@@ -28,12 +28,13 @@ A minimal, native, offline-first Android application designed exclusively for lo
 | **Phase 12** | Chat Templates & Context Profiling | **COMPLETE** | Multi-architecture chat templates (ChatML, Llama3, Gemma, Mistral, DeepSeek, Phi), real-time context token telemetry. |
 | **Phase 13** | Benchmarking Suite & Prompt Starters | **COMPLETE** | 64-token on-device inference benchmark (prefill & gen tok/s, TTFT), zero-tap empty-state prompt starters. |
 | **Phase 14** | Multi-Conversation History & Auto-Titles | **COMPLETE** | ModalBottomSheet conversation switcher, auto title derivation from first user prompt without AI inference, delete/switch workflows. |
-| **Phase 15** | Persona Presets & System Prompt Engine | **COMPLETE** | Curated persona library (General, Coding, Reasoner, Editor, Summarizer), custom system prompt persistence in DataStore, dynamic template injection. |
+| **Phase 15** | System Prompt Engine & Context Telemetry | **COMPLETE** | Custom system prompt configuration in DataStore, dynamic template injection, and token estimation telemetry. |
 | **Phase 16** | Hardware-Aware Generation Profiles & Thermal Diagnostics | **COMPLETE** | Preset inference profiles (Balanced, Turbo, Battery Saver, Deterministic, Creative), KV cache reuse metrics, battery & thermal throttling monitor. |
 | **Phase 17** | Engine Diagnostic Telemetry & Open-Source Compliance | **COMPLETE** | Centralized `EngineLogger` ring buffer with StateFlow UI bridge, log level filtering, 1-click debug export, engine lifecycle & parser instrumentation, and interactive open-source license disclosures. |
 | **Phase 18** | Model Storage Analytics, Search/Filter & GGUF Inspection | **COMPLETE** | Disk storage breakdown vs free internal space (`StatFs`), multi-field real-time model search, architecture/quantization filter chips, multi-mode sorting (Recent, A-Z, Largest, Smallest), and detailed GGUF metadata inspector bottom sheet. |
-| **Phase 19** | Conversation Forking, Message Search & Native Offline TTS Voice | **COMPLETE** | In-chat message keyword search and filtering, 1-tap conversation branching/forking from any past message in history, and native on-device Text-to-Speech (TTS) voice playback with zero network dependencies. |
-| **Phase 20** | Full Database JSON Backup/Restore & Context Memory Compression | **COMPLETE** | 1-click JSON backup export & restore merging with share sheet, and active context compression summarizing long conversation turns into consolidated memory. |
+| **Phase 19** | Conversation Forking & In-Chat Search | **COMPLETE** | In-chat message keyword search and filtering, 1-tap conversation branching/forking from any past message in history with zero network dependencies. |
+| **Phase 20** | Engine Safety Hardening & Native JNI Build Pipeline | **COMPLETE** | Full CMake C++ native build integration (`arm64-v8a`, `x86_64`), package unification under `com.dilipkumarkv.localgguf`, and strict native error propagation. |
+| **Phase 21** | GBNF Grammar & JSON Schema Guided Generation | **COMPLETE** | GGML BNF grammar parser, JSON Schema to GBNF converter, structured output presets (Sentiment, Entity Extractor, Planner, Boolean, JSON), and interactive preview. |
 
 ---
 

@@ -3,7 +3,7 @@
 ## 1. Network & Privacy Audit
 - **Network Permissions**: Audited `AndroidManifest.xml`. `android.permission.INTERNET` is **NOT** present.
 - **Outbound HTTP/Socket Traffic**: Zero HTTP clients, zero analytics SDKs, zero crash-reporting pings.
-- **Data Location**: 100% of chats, models, parameters, and metadata reside strictly within the application's private sandbox directory (`/data/data/com.aistudio.localllm.gguf/`).
+- **Data Location**: 100% of chats, models, parameters, and metadata reside strictly within the application's private sandbox directory (`/data/data/com.dilipkumarkv.localgguf/`).
 
 ## 2. Memory & Hardware Safety Guardrails
 - **Pre-load Heap & System RAM Check**: Every model load evaluates `ActivityManager.MemoryInfo.availMem`.
