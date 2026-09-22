@@ -1,0 +1,6 @@
+{
+  "name": "Local GGUF",
+  "description": "Minimal native offline GGUF local LLM client for Android powered by llama.cpp",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

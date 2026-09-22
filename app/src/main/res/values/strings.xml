@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">Local GGUF</string>
+    <string name="nav_models">Models</string>
+    <string name="nav_chat">Chat</string>
+    <string name="nav_settings">Settings</string>
+    <string name="title_models">Model Library</string>
+    <string name="title_chat">Local Chat</string>
+    <string name="title_settings">Inference Settings</string>
+    <string name="import_model">Import GGUF</string>
+    <string name="no_models_found">No GGUF models imported yet</string>
+    <string name="import_description">Import a downloaded .gguf file from device storage to begin offline inference.</string>
+</resources>
