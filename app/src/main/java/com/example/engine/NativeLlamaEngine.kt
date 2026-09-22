@@ -172,6 +172,17 @@ class NativeLlamaEngine(
         _state.value = InferenceState.GENERATING
         emit(GenerationEvent.Started)
 
+        // Apply GBNF grammar if configured
+        val activeGrammar = parameters.grammar
+        if (!activeGrammar.isNullOrBlank()) {
+            try {
+                NativeLlamaBridge.setGrammar(nativeHandle, activeGrammar)
+                EngineLogger.i("NATIVE_LLAMA", "Applied GBNF grammar constraint", "type=${parameters.grammarTypeName}")
+            } catch (e: Throwable) {
+                EngineLogger.w("NATIVE_LLAMA", "Could not set native grammar constraint", e.message)
+            }
+        }
+
         val prompt = ChatTemplateHelper.formatPrompt(
             messages = messages,
             architecture = activeModelInfo?.architecture ?: "llama",
@@ -222,6 +233,12 @@ class NativeLlamaEngine(
 
             emit(GenerationEvent.Token(piece, generatedCount))
             generatedCount++
+        }
+
+        if (!activeGrammar.isNullOrBlank()) {
+            try {
+                NativeLlamaBridge.clearGrammar(nativeHandle)
+            } catch (ignored: Throwable) {}
         }
 
         val genMs = (System.currentTimeMillis() - genStartTime).coerceAtLeast(1)

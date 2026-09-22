@@ -195,20 +195,43 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun `test system prompt presets defined and non-empty`() {
-        val presets = GenerationParameters.PRESETS
-        assertEquals(5, presets.size)
-        assertTrue(presets.any { it.id == "general" })
-        assertTrue(presets.any { it.id == "coding" })
-        assertTrue(presets.any { it.id == "reasoner" })
-        assertTrue(presets.any { it.id == "writer" })
-        assertTrue(presets.any { it.id == "summarizer" })
+    fun `test gbnf grammar presets and validation`() {
+        val presets = com.example.engine.GbnfGrammarHelper.BUILT_IN_PRESETS
+        assertTrue(presets.isNotEmpty())
+        assertTrue(presets.any { it.id == "json_generic" })
+        assertTrue(presets.any { it.id == "sentiment" })
+        assertTrue(presets.any { it.id == "task_planner" })
 
+        // Validate GBNF syntax for presets
         presets.forEach { preset ->
-            assertTrue("Preset prompt must not be blank", preset.prompt.isNotBlank())
-            assertTrue("Preset title must not be blank", preset.title.isNotBlank())
-            assertTrue("Preset description must not be blank", preset.description.isNotBlank())
+            val validation = com.example.engine.GbnfGrammarHelper.validateGbnf(preset.gbnf)
+            assertTrue("Preset '${preset.id}' must be valid GBNF: ${validation.message}", validation.isValid)
         }
+
+        // Validate JSON Schema to GBNF converter
+        val testSchema = """
+        {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "age": { "type": "integer" },
+            "active": { "type": "boolean" }
+          },
+          "required": ["name", "age"]
+        }
+        """.trimIndent()
+        val convertedGbnf = com.example.engine.GbnfGrammarHelper.convertJsonSchemaToGbnf(testSchema)
+        assertTrue(convertedGbnf.contains("root ::="))
+        assertTrue(convertedGbnf.contains("name"))
+        assertTrue(convertedGbnf.contains("age"))
+        assertTrue(convertedGbnf.contains("active"))
+
+        // Validate enum choice GBNF generator
+        val choices = listOf("ALPHA", "BETA", "GAMMA")
+        val choiceGbnf = com.example.engine.GbnfGrammarHelper.createChoiceEnumGbnf(choices)
+        assertTrue(choiceGbnf.contains("\"ALPHA\""))
+        assertTrue(choiceGbnf.contains("\"BETA\""))
+        assertTrue(choiceGbnf.contains("\"GAMMA\""))
     }
 
     @Test

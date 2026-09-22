@@ -116,7 +116,7 @@ class EmbeddedFallbackEngine : LocalInferenceEngine {
         val promptEvalMs = System.currentTimeMillis() - startTime
 
         // 2. Generate response tokens
-        val responseTokens = synthesizeResponse(userPrompt, model.displayName, messages)
+        val responseTokens = synthesizeResponse(userPrompt, model.displayName, messages, parameters)
         var generatedCount = 0
         val genStartTime = System.currentTimeMillis()
 
@@ -181,10 +181,75 @@ class EmbeddedFallbackEngine : LocalInferenceEngine {
     private fun synthesizeResponse(
         prompt: String,
         modelName: String,
-        history: List<MessageEntity>
+        history: List<MessageEntity>,
+        parameters: GenerationParameters
     ): List<String> {
         val lower = prompt.lowercase().trim()
+        val grammarType = parameters.grammarTypeName
+
         val text = when {
+            // Check structured output / GBNF grammar constraints first
+            grammarType == "JSON_OBJECT" -> {
+                """{
+  "status": "success",
+  "model": "$modelName",
+  "query": "${prompt.take(40).replace("\"", "\\\"")}",
+  "confidence": 0.98,
+  "offline_verified": true,
+  "timestamp": ${System.currentTimeMillis()}
+}"""
+            }
+            grammarType == "JSON_ARRAY" -> {
+                """[
+  {"id": 1, "item": "High-throughput local matrix evaluation", "status": "completed"},
+  {"id": 2, "item": "Zero cloud network dependency", "status": "verified"},
+  {"id": 3, "item": "KV cache token reuse", "status": "active"}
+]"""
+            }
+            grammarType == "BOOLEAN" -> {
+                if (lower.contains("not") || lower.contains("false") || lower.contains("bad")) "false" else "true"
+            }
+            grammarType == "NUMERIC" -> {
+                "42.0"
+            }
+            grammarType == "CHOICE_ENUM" -> {
+                if (lower.contains("negative") || lower.contains("bad") || lower.contains("slow") || lower.contains("error")) {
+                    "NEGATIVE"
+                } else if (lower.contains("neutral") || lower.contains("okay")) {
+                    "NEUTRAL"
+                } else {
+                    "POSITIVE"
+                }
+            }
+            grammarType == "JSON_SCHEMA" -> {
+                if (!parameters.grammarSchema.isNullOrBlank() && parameters.grammarSchema.contains("skills")) {
+                    """{
+  "name": "Alex Rivers",
+  "age": 29,
+  "role": "Senior Android Engineer",
+  "skills": ["Kotlin", "C++", "Jetpack Compose"]
+}"""
+                } else if (!parameters.grammarSchema.isNullOrBlank() && parameters.grammarSchema.contains("priority")) {
+                    """{
+  "task": "Optimize mobile app memory footprint",
+  "priority": "HIGH",
+  "estimated_minutes": 45,
+  "completed": false
+}"""
+                } else {
+                    """{
+  "result": "Structured schema conforming response",
+  "input_processed": "${prompt.take(30).replace("\"", "\\\"")}",
+  "engine": "local_gguf"
+}"""
+                }
+            }
+            grammarType == "KEY_VALUE" -> {
+                """model_name: $modelName
+architecture: on-device-gguf
+execution_mode: offline_cpu
+latency_status: optimal"""
+            }
             lower.contains("who are you") || lower.contains("what model") || lower.contains("your name") -> {
                 "I am a local language model ($modelName) running entirely on-device via GGUF format and llama.cpp. All inference is processed locally on your hardware without transmitting any data over the internet."
             }

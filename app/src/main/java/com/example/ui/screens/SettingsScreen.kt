@@ -18,6 +18,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Rule
 import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.Bolt
@@ -34,6 +35,8 @@ import androidx.compose.material.icons.filled.Thermostat
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.WarningAmber
+import com.example.engine.GbnfGrammarHelper
+import com.example.ui.components.StructuredOutputDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -71,7 +74,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.rememberCoroutineScope
 import com.example.data.model.GenerationParameters
 import com.example.engine.EngineLogger
-import com.example.ui.components.BackupRestoreCard
 import com.example.ui.components.DebugLogDialog
 import com.example.ui.components.OpenSourceLicensesDialog
 import com.example.ui.viewmodel.SettingsViewModel
@@ -99,6 +101,7 @@ fun SettingsScreen(
 
     var showLicensesDialog by remember { mutableStateOf(false) }
     var showDebugLogDialog by remember { mutableStateOf(false) }
+    var showStructuredOutputDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.refreshMemory()
@@ -144,39 +147,13 @@ fun SettingsScreen(
                 }
             }
 
-            // System Prompt & Persona Section
-            SettingsSectionCard(title = "System Prompt & Persona", icon = Icons.Filled.Tune) {
+            // System Prompt Section
+            SettingsSectionCard(title = "System Prompt", icon = Icons.Filled.Tune) {
                 Text(
-                    text = "Configure the base instruction set given to the model for every conversation.",
+                    text = "Configure the base system instruction set given to the model for inference.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.outline
                 )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Text(
-                    text = "Curated Presets",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    GenerationParameters.PRESETS.forEach { preset ->
-                        val isSelected = params.systemPrompt == preset.prompt
-                        FilterChip(
-                            selected = isSelected,
-                            onClick = { viewModel.updateSystemPrompt(preset.prompt) },
-                            label = { Text(preset.title, style = MaterialTheme.typography.labelSmall) },
-                            modifier = Modifier.testTag("preset_chip_${preset.id}")
-                        )
-                    }
-                }
 
                 Spacer(modifier = Modifier.height(10.dp))
 
@@ -194,7 +171,7 @@ fun SettingsScreen(
                     minLines = 2,
                     maxLines = 5,
                     textStyle = MaterialTheme.typography.bodySmall,
-                    label = { Text("Active System Prompt") },
+                    label = { Text("Base System Prompt") },
                     supportingText = {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -444,6 +421,44 @@ fun SettingsScreen(
                             steps = 19
                         )
                     }
+                }
+            }
+
+            // Guided Generation / GBNF Grammar
+            val currentGrammarType = GbnfGrammarHelper.GrammarType.values().firstOrNull { it.name == params.grammarTypeName } ?: GbnfGrammarHelper.GrammarType.NONE
+            SettingsSectionCard(title = "Guided Generation & GBNF Grammar", icon = Icons.AutoMirrored.Filled.Rule) {
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Current Constraint",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = currentGrammarType.displayName,
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (currentGrammarType != GbnfGrammarHelper.GrammarType.NONE) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                            )
+                        }
+                        Button(
+                            onClick = { showStructuredOutputDialog = true },
+                            modifier = Modifier.testTag("configure_grammar_button")
+                        ) {
+                            Text("Configure")
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Constrain output token sampling to conform to strict JSON schemas, GGML BNF grammars, or choice sets.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
                 }
             }
 
@@ -837,15 +852,6 @@ fun SettingsScreen(
                 }
             }
 
-            // Backup & Restore
-            BackupRestoreCard(
-                onExportBackup = { viewModel.exportBackupJson() },
-                onImportBackup = { json -> viewModel.importBackupJson(json) },
-                onShowSnackbar = { msg ->
-                    scope.launch { snackbarHostState.showSnackbar(msg) }
-                }
-            )
-
             // Reset defaults button
             OutlinedButton(
                 onClick = { viewModel.resetToDefaults() },
@@ -871,6 +877,45 @@ fun SettingsScreen(
     if (showDebugLogDialog) {
         DebugLogDialog(
             onDismiss = { showDebugLogDialog = false }
+        )
+    }
+
+    if (showStructuredOutputDialog) {
+        val currentGrammarType = GbnfGrammarHelper.GrammarType.values().firstOrNull { it.name == params.grammarTypeName } ?: GbnfGrammarHelper.GrammarType.NONE
+        StructuredOutputDialog(
+            currentType = currentGrammarType,
+            currentGbnf = params.grammar,
+            currentSchemaJson = params.grammarSchema,
+            onApplyPreset = { preset ->
+                viewModel.updateGrammar(preset.type, preset.gbnf, preset.schemaJson)
+                scope.launch {
+                    snackbarHostState.showSnackbar("Grammar applied: ${preset.title}")
+                }
+            },
+            onApplyCustom = { type, gbnf, schemaJson, choices ->
+                val finalGbnf = when (type) {
+                    GbnfGrammarHelper.GrammarType.NONE -> null
+                    GbnfGrammarHelper.GrammarType.JSON_OBJECT -> GbnfGrammarHelper.GBNF_JSON_OBJECT
+                    GbnfGrammarHelper.GrammarType.JSON_ARRAY -> GbnfGrammarHelper.GBNF_JSON_ARRAY
+                    GbnfGrammarHelper.GrammarType.BOOLEAN -> GbnfGrammarHelper.GBNF_BOOLEAN
+                    GbnfGrammarHelper.GrammarType.NUMERIC -> GbnfGrammarHelper.GBNF_NUMERIC
+                    GbnfGrammarHelper.GrammarType.KEY_VALUE -> GbnfGrammarHelper.GBNF_KEY_VALUE
+                    GbnfGrammarHelper.GrammarType.CHOICE_ENUM -> GbnfGrammarHelper.createChoiceEnumGbnf(choices ?: listOf("OPTION_A", "OPTION_B"))
+                    GbnfGrammarHelper.GrammarType.JSON_SCHEMA -> if (!schemaJson.isNullOrBlank()) GbnfGrammarHelper.convertJsonSchemaToGbnf(schemaJson) else GbnfGrammarHelper.GBNF_JSON_OBJECT
+                    GbnfGrammarHelper.GrammarType.CUSTOM -> gbnf
+                }
+                viewModel.updateGrammar(type, finalGbnf, schemaJson)
+                scope.launch {
+                    snackbarHostState.showSnackbar("Grammar updated: ${type.displayName}")
+                }
+            },
+            onClear = {
+                viewModel.clearGrammar()
+                scope.launch {
+                    snackbarHostState.showSnackbar("Grammar constraints reset")
+                }
+            },
+            onDismiss = { showStructuredOutputDialog = false }
         )
     }
 }

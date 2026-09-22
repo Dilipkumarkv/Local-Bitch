@@ -83,35 +83,6 @@ class ChatRepository(
     suspend fun deleteMessage(messageId: String) = withContext(Dispatchers.IO) {
         messageDao.deleteMessageById(messageId)
     }
-
-    suspend fun exportBackup(): String = withContext(Dispatchers.IO) {
-        val conversations = conversationDao.getAllConversationsList()
-        ConversationBackupManager.exportToJson(conversations) { convId ->
-            messageDao.getMessagesListForConversation(convId)
-        }
-    }
-
-    suspend fun importBackup(jsonString: String): Int = withContext(Dispatchers.IO) {
-        val (conversations, messages) = ConversationBackupManager.parseFromJson(jsonString)
-        for (conv in conversations) {
-            conversationDao.insertConversation(conv)
-        }
-        for (msg in messages) {
-            messageDao.insertMessage(msg)
-        }
-        conversations.size
-    }
-
-    suspend fun compressConversation(conversationId: String, summary: String) = withContext(Dispatchers.IO) {
-        messageDao.deleteMessagesForConversation(conversationId)
-        val summaryMsg = MessageEntity(
-            id = UUID.randomUUID().toString(),
-            conversationId = conversationId,
-            role = MessageRole.SYSTEM,
-            content = "## Conversation History Summary\n$summary",
-            timestamp = System.currentTimeMillis()
-        )
-        messageDao.insertMessage(summaryMsg)
-    }
 }
+
 

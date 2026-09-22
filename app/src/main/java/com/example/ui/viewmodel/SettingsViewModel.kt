@@ -36,8 +36,7 @@ data class BenchmarkResult(
 class SettingsViewModel(
     private val settingsRepository: SettingsRepository,
     private val context: Context,
-    private val inferenceEngine: LocalInferenceEngine? = null,
-    private val chatRepository: ChatRepository? = null
+    private val inferenceEngine: LocalInferenceEngine? = null
 ) : ViewModel() {
 
     val parameters: StateFlow<GenerationParameters> = settingsRepository.generationParameters
@@ -211,18 +210,34 @@ class SettingsViewModel(
         }
     }
 
+    fun updateGrammar(type: com.example.engine.GbnfGrammarHelper.GrammarType, gbnf: String?, schemaJson: String?) {
+        viewModelScope.launch {
+            settingsRepository.updateParameters(
+                parameters.value.copy(
+                    grammar = gbnf,
+                    grammarTypeName = type.name,
+                    grammarSchema = schemaJson
+                )
+            )
+        }
+    }
+
+    fun clearGrammar() {
+        viewModelScope.launch {
+            settingsRepository.updateParameters(
+                parameters.value.copy(
+                    grammar = null,
+                    grammarTypeName = "NONE",
+                    grammarSchema = null
+                )
+            )
+        }
+    }
+
     fun setThemeMode(theme: String) {
         viewModelScope.launch {
             settingsRepository.setThemeMode(theme)
         }
-    }
-
-    suspend fun exportBackupJson(): String? {
-        return chatRepository?.exportBackup()
-    }
-
-    suspend fun importBackupJson(jsonString: String): Int {
-        return chatRepository?.importBackup(jsonString) ?: 0
     }
 
     fun resetToDefaults() {

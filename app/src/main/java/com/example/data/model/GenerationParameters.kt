@@ -1,12 +1,5 @@
 package com.example.data.model
 
-data class SystemPromptPreset(
-    val id: String,
-    val title: String,
-    val description: String,
-    val prompt: String
-)
-
 data class GenerationProfile(
     val id: String,
     val title: String,
@@ -43,43 +36,13 @@ data class GenerationParameters(
     val topK: Int = 40,
     val repeatPenalty: Float = 1.1f,
     val threads: Int = Runtime.getRuntime().availableProcessors().coerceIn(1, 8),
-    val systemPrompt: String = DEFAULT_SYSTEM_PROMPT
+    val systemPrompt: String = DEFAULT_SYSTEM_PROMPT,
+    val grammar: String? = null,
+    val grammarTypeName: String = "NONE",
+    val grammarSchema: String? = null
 ) {
     companion object {
         const val DEFAULT_SYSTEM_PROMPT = "You are a helpful, concise assistant running locally on Android."
-
-        val PRESETS = listOf(
-            SystemPromptPreset(
-                id = "general",
-                title = "General",
-                description = "Helpful and concise assistant",
-                prompt = DEFAULT_SYSTEM_PROMPT
-            ),
-            SystemPromptPreset(
-                id = "coding",
-                title = "Coding",
-                description = "Expert engineer, clean code, no fluff",
-                prompt = "You are an expert software engineer. Provide clean, secure, idiomatic code with concise technical explanations."
-            ),
-            SystemPromptPreset(
-                id = "reasoner",
-                title = "Reasoner",
-                description = "Direct, rigorous step-by-step logic",
-                prompt = "You are a rigorous, direct reasoning assistant. Answer questions concisely with step-by-step logic and zero filler."
-            ),
-            SystemPromptPreset(
-                id = "writer",
-                title = "Editor",
-                description = "Refines grammar, clarity, and style",
-                prompt = "You are an articulate writing editor. Refine clarity, tone, and grammar while preserving the original intent."
-            ),
-            SystemPromptPreset(
-                id = "summarizer",
-                title = "Summarizer",
-                description = "Extracts key insights and bullet points",
-                prompt = "You are an efficient summarization assistant. Extract key takeaways, bullet points, and core ideas clearly."
-            )
-        )
 
         val PROFILES = listOf(
             GenerationProfile(

@@ -30,7 +30,7 @@ class AppViewModelFactory(
                 ChatViewModel(chatRepository, settingsRepository, inferenceEngine) as T
             }
             modelClass.isAssignableFrom(SettingsViewModel::class.java) -> {
-                SettingsViewModel(settingsRepository, context, inferenceEngine, chatRepository) as T
+                SettingsViewModel(settingsRepository, context, inferenceEngine) as T
             }
             else -> throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
         }

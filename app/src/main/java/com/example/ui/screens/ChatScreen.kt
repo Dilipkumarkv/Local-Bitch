@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Rule
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bolt
@@ -40,6 +41,8 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.WarningAmber
 import com.example.data.model.GenerationParameters
+import com.example.engine.GbnfGrammarHelper
+import com.example.ui.components.StructuredOutputDialog
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -86,7 +89,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.content.Intent
 import com.example.data.model.MessageEntity
 import com.example.data.model.MessageRole
-import com.example.engine.TtsHelper
 import com.example.ui.components.ChatMessageItem
 import com.example.ui.components.DebugLogDialog
 import com.example.ui.components.MetricsBanner
@@ -127,26 +129,18 @@ fun ChatScreen(
     var showRenameDialog by remember { mutableStateOf(false) }
     var renameConvTitle by remember { mutableStateOf("") }
     var showConversationsSheet by remember { mutableStateOf(false) }
-    var showPersonaDialog by remember { mutableStateOf(false) }
     var showProfileDialog by remember { mutableStateOf(false) }
     var showDebugLogDialog by remember { mutableStateOf(false) }
-    var showCompressDialog by remember { mutableStateOf(false) }
+    var showStructuredOutputDialog by remember { mutableStateOf(false) }
+
+    val activeGrammarType by viewModel.activeGrammarType.collectAsStateWithLifecycle()
+    val activeGrammarGbnf by viewModel.activeGrammarGbnf.collectAsStateWithLifecycle()
+    val activeSchemaJson by viewModel.activeSchemaJson.collectAsStateWithLifecycle()
 
     var isSearching by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
 
-    val ttsHelper = remember { TtsHelper(context) }
-    val currentUtteranceId by ttsHelper.currentUtteranceId.collectAsStateWithLifecycle()
-    val isSpeaking by ttsHelper.isSpeaking.collectAsStateWithLifecycle()
-
-    DisposableEffect(Unit) {
-        onDispose {
-            ttsHelper.shutdown()
-        }
-    }
-
     val activeConv = conversations.firstOrNull { it.id == activeConvId }
-    val activePreset = GenerationParameters.PRESETS.firstOrNull { it.prompt == params.systemPrompt }
     val selectedProfileId by viewModel.selectedProfileId.collectAsStateWithLifecycle()
     val activeProfile = GenerationParameters.PROFILES.firstOrNull { it.id == selectedProfileId }
 
@@ -269,19 +263,24 @@ fun ChatScreen(
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text("Persona: ${activePreset?.title ?: "Custom"}") },
-                            leadingIcon = { Icon(Icons.Filled.Tune, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                            onClick = {
-                                showMenu = false
-                                showPersonaDialog = true
-                            }
-                        )
-                        DropdownMenuItem(
                             text = { Text("Power Profile: ${activeProfile?.title ?: "Custom"}") },
                             leadingIcon = { Icon(Icons.Filled.Bolt, contentDescription = null, modifier = Modifier.size(18.dp)) },
                             onClick = {
                                 showMenu = false
                                 showProfileDialog = true
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    if (activeGrammarType != GbnfGrammarHelper.GrammarType.NONE) "Constrained: ${activeGrammarType.displayName}"
+                                    else "Guided Generation (GBNF)"
+                                )
+                            },
+                            leadingIcon = { Icon(Icons.AutoMirrored.Filled.Rule, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                            onClick = {
+                                showMenu = false
+                                showStructuredOutputDialog = true
                             }
                         )
                         DropdownMenuItem(
@@ -320,20 +319,6 @@ fun ChatScreen(
                                 } else {
                                     scope.launch {
                                         snackbarHostState.showSnackbar("No messages to export")
-                                    }
-                                }
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Compress History") },
-                            leadingIcon = { Icon(Icons.Filled.Compress, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                            onClick = {
-                                showMenu = false
-                                if (messages.isNotEmpty()) {
-                                    showCompressDialog = true
-                                } else {
-                                    scope.launch {
-                                        snackbarHostState.showSnackbar("No messages to compress")
                                     }
                                 }
                             }
@@ -507,35 +492,6 @@ fun ChatScreen(
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center
                         )
 
-                        // Active Persona Pill
-                        Surface(
-                            shape = RoundedCornerShape(16.dp),
-                            color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.6f),
-                            modifier = Modifier
-                                .padding(top = 10.dp)
-                                .clickable { showPersonaDialog = true }
-                                .testTag("persona_badge_pill")
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Tune,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.secondary,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "Persona: ${activePreset?.title ?: "Custom"}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSecondaryContainer
-                                )
-                            }
-                        }
-
                         if (loadedModel != null) {
                             Spacer(modifier = Modifier.height(24.dp))
                             Text(
@@ -598,13 +554,11 @@ fun ChatScreen(
                         items(displayedMessages, key = { it.id }) { message ->
                             val isLastAssistant = message.role == MessageRole.ASSISTANT &&
                                     messages.indexOf(message) == messages.indexOfLast { it.role == MessageRole.ASSISTANT }
-                            val isSpeakingThis = isSpeaking && currentUtteranceId == message.id
 
                             ChatMessageItem(
                                 message = message,
                                 isLastAssistant = isLastAssistant,
                                 isGenerating = isGenerating,
-                                isSpeaking = isSpeakingThis,
                                 highlightQuery = if (isSearching) searchQuery else "",
                                 onRegenerate = { viewModel.regenerateLastResponse() },
                                 onEdit = {
@@ -616,13 +570,6 @@ fun ChatScreen(
                                     viewModel.forkConversationFromMessage(message.id)
                                     scope.launch {
                                         snackbarHostState.showSnackbar("Branched new chat from selected message")
-                                    }
-                                },
-                                onSpeak = {
-                                    if (isSpeakingThis) {
-                                        ttsHelper.stop()
-                                    } else {
-                                        ttsHelper.speak(message.content, message.id)
                                     }
                                 }
                             )
@@ -686,68 +633,129 @@ fun ChatScreen(
                 tonalElevation = 2.dp,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    TextField(
-                        value = inputText,
-                        onValueChange = { inputText = it },
-                        placeholder = { Text("Message local model...") },
-                        maxLines = 4,
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("chat_input_field"),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = TextFieldDefaults.colors(
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent
-                        )
-                    )
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    if (isGenerating) {
-                        IconButton(
-                            onClick = { viewModel.stopGeneration() },
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    if (activeGrammarType != GbnfGrammarHelper.GrammarType.NONE) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
                             modifier = Modifier
-                                .size(48.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.error)
-                                .testTag("stop_generation_button")
+                                .fillMaxWidth()
+                                .clickable { showStructuredOutputDialog = true }
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.Rule,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "Guided Constraint: ${activeGrammarType.displayName}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                }
+                                IconButton(
+                                    onClick = { viewModel.clearGrammar() },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Close,
+                                        contentDescription = "Disable constraint",
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = { showStructuredOutputDialog = true },
+                            modifier = Modifier
+                                .size(40.dp)
+                                .testTag("guided_generation_button")
                         ) {
                             Icon(
-                                imageVector = Icons.Filled.Stop,
-                                contentDescription = "Stop Generation",
-                                tint = MaterialTheme.colorScheme.onError
+                                imageVector = Icons.AutoMirrored.Filled.Rule,
+                                contentDescription = "Guided Output",
+                                tint = if (activeGrammarType != GbnfGrammarHelper.GrammarType.NONE) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                    } else {
-                        IconButton(
-                            onClick = {
-                                if (inputText.isNotBlank()) {
-                                    viewModel.sendMessage(inputText)
-                                    inputText = ""
-                                }
-                            },
-                            enabled = inputText.isNotBlank(),
+
+                        Spacer(modifier = Modifier.width(4.dp))
+
+                        TextField(
+                            value = inputText,
+                            onValueChange = { inputText = it },
+                            placeholder = { Text("Message local model...") },
+                            maxLines = 4,
                             modifier = Modifier
-                                .size(48.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    if (inputText.isNotBlank()) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.surfaceVariant
-                                )
-                                .testTag("send_message_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.Send,
-                                contentDescription = "Send Message",
-                                tint = if (inputText.isNotBlank()) MaterialTheme.colorScheme.onPrimary
-                                else MaterialTheme.colorScheme.outline
+                                .weight(1f)
+                                .testTag("chat_input_field"),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = TextFieldDefaults.colors(
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent
                             )
+                        )
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        if (isGenerating) {
+                            IconButton(
+                                onClick = { viewModel.stopGeneration() },
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.error)
+                                    .testTag("stop_generation_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Stop,
+                                    contentDescription = "Stop Generation",
+                                    tint = MaterialTheme.colorScheme.onError
+                                )
+                            }
+                        } else {
+                            IconButton(
+                                onClick = {
+                                    if (inputText.isNotBlank()) {
+                                        viewModel.sendMessage(inputText)
+                                        inputText = ""
+                                    }
+                                },
+                                enabled = inputText.isNotBlank(),
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (inputText.isNotBlank()) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.surfaceVariant
+                                    )
+                                    .testTag("send_message_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.Send,
+                                    contentDescription = "Send Message",
+                                    tint = if (inputText.isNotBlank()) MaterialTheme.colorScheme.onPrimary
+                                    else MaterialTheme.colorScheme.outline
+                                )
+                            }
                         }
                     }
                 }
@@ -961,94 +969,6 @@ fun ChatScreen(
         }
     }
 
-    // Persona Selection Dialog
-    if (showPersonaDialog) {
-        AlertDialog(
-            onDismissRequest = { showPersonaDialog = false },
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Filled.Tune,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Select Persona")
-                }
-            },
-            text = {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "Choose an instruction persona for local inference:",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    GenerationParameters.PRESETS.forEach { preset ->
-                        val isSelected = params.systemPrompt == preset.prompt
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = if (isSelected) {
-                                MaterialTheme.colorScheme.primaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    viewModel.updateSystemPrompt(preset.prompt)
-                                    showPersonaDialog = false
-                                }
-                                .testTag("persona_dialog_item_${preset.id}")
-                        ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = preset.title,
-                                        style = MaterialTheme.typography.labelLarge,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                                    )
-                                    if (isSelected) {
-                                        Icon(
-                                            Icons.Filled.CheckCircle,
-                                            contentDescription = "Selected",
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                }
-                                Text(
-                                    text = preset.description,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.outline
-                                )
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = { showPersonaDialog = false },
-                    modifier = Modifier.testTag("persona_dialog_done_button")
-                ) {
-                    Text("Done")
-                }
-            }
-        )
-    }
-
     // Profile selection dialog
     if (showProfileDialog) {
         AlertDialog(
@@ -1143,43 +1063,33 @@ fun ChatScreen(
         )
     }
 
-    if (showCompressDialog) {
-        AlertDialog(
-            onDismissRequest = { showCompressDialog = false },
-            icon = {
-                Icon(
-                    Icons.Filled.Compress,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(28.dp)
-                )
-            },
-            title = { Text("Compress History?") },
-            text = {
-                Text(
-                    "This replaces earlier turns in this chat with a concise system memory summary, freeing up local context tokens while retaining core dialogue memory.",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        showCompressDialog = false
-                        viewModel.compressContextWithSummary()
-                        scope.launch {
-                            snackbarHostState.showSnackbar("History compressed into context summary")
-                        }
-                    },
-                    modifier = Modifier.testTag("confirm_compress_button")
-                ) {
-                    Text("Compress")
+    if (showStructuredOutputDialog) {
+        StructuredOutputDialog(
+            currentType = activeGrammarType,
+            currentGbnf = activeGrammarGbnf,
+            currentSchemaJson = activeSchemaJson,
+            onApplyPreset = { preset ->
+                viewModel.setGrammarPreset(preset)
+                if (inputText.isBlank()) {
+                    inputText = preset.samplePrompt
+                }
+                scope.launch {
+                    snackbarHostState.showSnackbar("Structured format applied: ${preset.title}")
                 }
             },
-            dismissButton = {
-                TextButton(onClick = { showCompressDialog = false }) {
-                    Text("Cancel")
+            onApplyCustom = { type, gbnf, schemaJson, choices ->
+                viewModel.setGrammarType(type, gbnf, schemaJson, choices)
+                scope.launch {
+                    snackbarHostState.showSnackbar("Constrained output active: ${type.displayName}")
                 }
-            }
+            },
+            onClear = {
+                viewModel.clearGrammar()
+                scope.launch {
+                    snackbarHostState.showSnackbar("Grammar constraints cleared")
+                }
+            },
+            onDismiss = { showStructuredOutputDialog = false }
         )
     }
 }

@@ -13,13 +13,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CallSplit
+import androidx.compose.material.icons.automirrored.filled.CallSplit
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -46,13 +44,11 @@ fun ChatMessageItem(
     message: MessageEntity,
     isLastAssistant: Boolean,
     isGenerating: Boolean,
-    isSpeaking: Boolean = false,
     highlightQuery: String = "",
     onRegenerate: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onFork: () -> Unit,
-    onSpeak: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val isUser = message.role == MessageRole.USER
@@ -150,22 +146,6 @@ fun ChatMessageItem(
                 )
             }
 
-            if (!isUser) {
-                IconButton(
-                    onClick = onSpeak,
-                    modifier = Modifier
-                        .size(28.dp)
-                        .testTag("speak_message_${message.id}")
-                ) {
-                    Icon(
-                        imageVector = if (isSpeaking) Icons.Filled.Stop else Icons.Filled.VolumeUp,
-                        contentDescription = if (isSpeaking) "Stop speaking" else "Read aloud",
-                        tint = if (isSpeaking) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline,
-                        modifier = Modifier.size(15.dp)
-                    )
-                }
-            }
-
             IconButton(
                 onClick = onFork,
                 modifier = Modifier
@@ -173,7 +153,7 @@ fun ChatMessageItem(
                     .testTag("fork_message_${message.id}")
             ) {
                 Icon(
-                    imageVector = Icons.Filled.CallSplit,
+                    imageVector = Icons.AutoMirrored.Filled.CallSplit,
                     contentDescription = "Branch conversation from here",
                     tint = MaterialTheme.colorScheme.outline,
                     modifier = Modifier.size(15.dp)
@@ -228,4 +208,5 @@ fun ChatMessageItem(
         }
     }
 }
+
 

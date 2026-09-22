@@ -78,6 +78,72 @@ class ChatViewModel(
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
+    private val _activeGrammarType = MutableStateFlow(com.example.engine.GbnfGrammarHelper.GrammarType.NONE)
+    val activeGrammarType: StateFlow<com.example.engine.GbnfGrammarHelper.GrammarType> = _activeGrammarType.asStateFlow()
+
+    private val _activeGrammarGbnf = MutableStateFlow<String?>(null)
+    val activeGrammarGbnf: StateFlow<String?> = _activeGrammarGbnf.asStateFlow()
+
+    private val _activeSchemaJson = MutableStateFlow<String?>(null)
+    val activeSchemaJson: StateFlow<String?> = _activeSchemaJson.asStateFlow()
+
+    fun setGrammarPreset(preset: com.example.engine.GbnfGrammarHelper.GrammarPreset) {
+        _activeGrammarType.value = preset.type
+        _activeGrammarGbnf.value = preset.gbnf
+        _activeSchemaJson.value = preset.schemaJson
+        viewModelScope.launch {
+            settingsRepository.updateParameters(
+                parameters.value.copy(
+                    grammar = preset.gbnf,
+                    grammarTypeName = preset.type.name,
+                    grammarSchema = preset.schemaJson
+                )
+            )
+        }
+    }
+
+    fun setGrammarType(type: com.example.engine.GbnfGrammarHelper.GrammarType, customGbnf: String? = null, schemaJson: String? = null, choices: List<String>? = null) {
+        _activeGrammarType.value = type
+        val gbnf = when (type) {
+            com.example.engine.GbnfGrammarHelper.GrammarType.NONE -> null
+            com.example.engine.GbnfGrammarHelper.GrammarType.JSON_OBJECT -> com.example.engine.GbnfGrammarHelper.GBNF_JSON_OBJECT
+            com.example.engine.GbnfGrammarHelper.GrammarType.JSON_ARRAY -> com.example.engine.GbnfGrammarHelper.GBNF_JSON_ARRAY
+            com.example.engine.GbnfGrammarHelper.GrammarType.BOOLEAN -> com.example.engine.GbnfGrammarHelper.GBNF_BOOLEAN
+            com.example.engine.GbnfGrammarHelper.GrammarType.NUMERIC -> com.example.engine.GbnfGrammarHelper.GBNF_NUMERIC
+            com.example.engine.GbnfGrammarHelper.GrammarType.KEY_VALUE -> com.example.engine.GbnfGrammarHelper.GBNF_KEY_VALUE
+            com.example.engine.GbnfGrammarHelper.GrammarType.CHOICE_ENUM -> com.example.engine.GbnfGrammarHelper.createChoiceEnumGbnf(choices ?: listOf("OPTION_A", "OPTION_B"))
+            com.example.engine.GbnfGrammarHelper.GrammarType.JSON_SCHEMA -> if (!schemaJson.isNullOrBlank()) com.example.engine.GbnfGrammarHelper.convertJsonSchemaToGbnf(schemaJson) else com.example.engine.GbnfGrammarHelper.GBNF_JSON_OBJECT
+            com.example.engine.GbnfGrammarHelper.GrammarType.CUSTOM -> customGbnf
+        }
+        _activeGrammarGbnf.value = gbnf
+        _activeSchemaJson.value = schemaJson
+
+        viewModelScope.launch {
+            settingsRepository.updateParameters(
+                parameters.value.copy(
+                    grammar = gbnf,
+                    grammarTypeName = type.name,
+                    grammarSchema = schemaJson
+                )
+            )
+        }
+    }
+
+    fun clearGrammar() {
+        _activeGrammarType.value = com.example.engine.GbnfGrammarHelper.GrammarType.NONE
+        _activeGrammarGbnf.value = null
+        _activeSchemaJson.value = null
+        viewModelScope.launch {
+            settingsRepository.updateParameters(
+                parameters.value.copy(
+                    grammar = null,
+                    grammarTypeName = "NONE",
+                    grammarSchema = null
+                )
+            )
+        }
+    }
+
     private var generationJob: Job? = null
 
     init {
@@ -320,34 +386,6 @@ class ChatViewModel(
         if (_isGenerating.value) stopGeneration()
         viewModelScope.launch {
             chatRepository.clearConversationMessages(convId)
-            _streamingContent.value = ""
-            _currentStats.value = null
-        }
-    }
-
-    fun compressContextWithSummary(customSummary: String? = null) {
-        val convId = _activeConversationId.value ?: return
-        if (_isGenerating.value) stopGeneration()
-
-        viewModelScope.launch {
-            val messages = chatRepository.getMessagesList(convId)
-            if (messages.isEmpty()) return@launch
-
-            val summaryText = if (!customSummary.isNullOrBlank()) {
-                customSummary.trim()
-            } else {
-                val sb = StringBuilder()
-                sb.append("Summary of prior ").append(messages.size).append(" turns:\n")
-                messages.forEach { msg ->
-                    val roleLabel = if (msg.role == MessageRole.USER) "User" else "Assistant"
-                    val line = msg.content.lines().firstOrNull()?.trim() ?: ""
-                    val shortLine = if (line.length > 80) line.take(80) + "…" else line
-                    sb.append("- ").append(roleLabel).append(": ").append(shortLine).append("\n")
-                }
-                sb.toString().trim()
-            }
-
-            chatRepository.compressConversation(convId, summaryText)
             _streamingContent.value = ""
             _currentStats.value = null
         }

@@ -32,6 +32,8 @@ object NativeLlamaBridge {
     external fun initModel(path: String, contextSize: Int, threads: Int): Long
     external fun freeModel(handle: Long)
     external fun evalPrompt(handle: Long, prompt: String): Boolean
+    external fun setGrammar(handle: Long, grammarStr: String): Boolean
+    external fun clearGrammar(handle: Long)
     external fun nextToken(handle: Long, temp: Float, topP: Float, topK: Int): String?
     external fun isFinished(handle: Long): Boolean
 }
